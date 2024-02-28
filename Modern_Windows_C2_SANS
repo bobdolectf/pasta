@@ -1,0 +1,8 @@
+
+- SDDL - security descriptor definition language
+    permissionsed tied to objects
+// with win32 API its possible to modify and hide services
+
+    ```
+    sdshow bits
+    ```

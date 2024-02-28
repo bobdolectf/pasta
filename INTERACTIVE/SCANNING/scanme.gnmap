@@ -1,0 +1,6 @@
+# Nmap 7.80 scan initiated Sat Jun 25 13:48:15 2022 as: nmap -sS -T4 -A -sC -oA scanme --top-ports 100 --stylesheet ./nmap-bootstrap.xsl scanme.nmap.org scanme2.nmap.org
+Host: 45.33.32.156 (scanme.nmap.org)	Status: Up
+Host: 45.33.32.156 (scanme.nmap.org)	Ports: 22/open/tcp//ssh//OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.13 (Ubuntu Linux; protocol 2.0)/, 53/open/tcp//domain//dnsmasq UNKNOWN/, 80/open/tcp//http//Apache httpd 2.4.7 ((Ubuntu))/, 135/filtered/tcp//msrpc///, 139/filtered/tcp//netbios-ssn///, 646/filtered/tcp//ldp///	Ignored State: closed (94)	Seq Index: 258	IP ID Seq: All zeros
+Host: 45.33.49.119 (ack.nmap.org)	Status: Up
+Host: 45.33.49.119 (ack.nmap.org)	Ports: 22/open/tcp//ssh//OpenSSH 7.4 (protocol 2.0)/, 25/open/tcp//smtp//Postfix smtpd/, 53/open/tcp//domain//dnsmasq UNKNOWN/, 80/open/tcp//http//Apache httpd 2.4.6/, 113/closed/tcp//ident///, 443/open/tcp//ssl|ssl//Apache httpd (SSL-only mode)/	Ignored State: filtered (94)	Seq Index: 259	IP ID Seq: All zeros
+# Nmap done at Sat Jun 25 13:48:45 2022 -- 2 IP addresses (2 hosts up) scanned in 30.66 seconds

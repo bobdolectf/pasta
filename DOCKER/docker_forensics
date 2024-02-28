@@ -1,0 +1,12 @@
+container-diff analyze -t history challenge-image.tar
+
+container-diff analyze webserver.tar --type=history
+
+tar -xf webserver.tar
+
+cat manifest.json | python -m json.tool
+
+
+//Check chnages made after starting, this is very good to test to see if any players dorked anything up during playtime
+
+docker diff <container-name>

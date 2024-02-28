@@ -1,0 +1,17 @@
+## iptables
+iptables -I INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination <C2-IP-Address or Hostname>:443
+iptables -t nat -A POSTROUTING -j MASQUERADE
+iptables -I FORWARD -j ACCEPT
+iptables -P FORWARD ACCEPT
+
+## ssh
+Open the SSH daemon config with vim /etc/ssh/sshd_config or nano /etc/ssh/sshd_config on the redirector. Change the value of GatewayPorts and AllowTcpForwarding to yes.
+
+GatewayPorts yes
+AllowTcpForwarding yes
+
+## ip routing
+# sysctl net.ipv4.ip_forward
+net.ipv4.ip_forward = 0
+

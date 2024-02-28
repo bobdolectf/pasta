@@ -1,0 +1,305 @@
+    function Convert-LDAPProperty {
+<#
+    .SYNOPSIS
+
+        Helper that converts specific LDAP property result fields.
+        Used by several of the Get-Net* function.
+    .PARAMETER Properties
+        Properties object to extract out LDAP fields for display.
+#>
+    param(
+        [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
+        [ValidateNotNullOrEmpty()]
+        $Properties
+    )
+
+    $ObjectProperties = @{}
+
+    $Properties.PropertyNames | ForEach-Object {
+        if (($_ -eq "objectsid") -or ($_ -eq "sidhistory")) {
+            # convert the SID to a string
+            $ObjectProperties[$_] = (New-Object System.Security.Principal.SecurityIdentifier($Properties[$_][0],0)).Value
+        }
+        elseif($_ -eq "objectguid") {
+            # convert the GUID to a string
+            $ObjectProperties[$_] = (New-Object Guid (,$Properties[$_][0])).Guid
+        }
+        elseif( ($_ -eq "lastlogon") -or ($_ -eq "lastlogontimestamp") -or ($_ -eq "pwdlastset") -or ($_ -eq "lastlogoff") -or ($_ -eq "badPasswordTime") ) {
+            # convert timestamps
+            if ($Properties[$_][0] -is [System.MarshalByRefObject]) {
+                # if we have a System.__ComObject
+                $Temp = $Properties[$_][0]
+                [Int32]$High = $Temp.GetType().InvokeMember("HighPart", [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                [Int32]$Low  = $Temp.GetType().InvokeMember("LowPart",  [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                $ObjectProperties[$_] = ([datetime]::FromFileTime([Int64]("0x{0:x8}{1:x8}" -f $High, $Low)))
+            }
+            else {
+                $ObjectProperties[$_] = ([datetime]::FromFileTime(($Properties[$_][0])))
+            }
+        }
+        elseif($Properties[$_][0] -is [System.MarshalByRefObject]) {
+            # try to convert misc com objects
+            $Prop = $Properties[$_]
+            try {
+                $Temp = $Prop[$_][0]
+                Write-Verbose $_
+                [Int32]$High = $Temp.GetType().InvokeMember("HighPart", [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                [Int32]$Low  = $Temp.GetType().InvokeMember("LowPart",  [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                $ObjectProperties[$_] = [Int64]("0x{0:x8}{1:x8}" -f $High, $Low)
+            }
+            catch {
+                $ObjectProperties[$_] = $Prop[$_]
+            }
+        }
+        elseif($Properties[$_].count -eq 1) {
+            $ObjectProperties[$_] = $Properties[$_][0]
+        }
+        else {
+            $ObjectProperties[$_] = $Properties[$_]
+        }
+    }
+
+    New-Object -TypeName PSObject -Property $ObjectProperties
+}
+
+    filter Get-DomainSearcher {
+<#
+    .SYNOPSIS
+        Helper used by various functions that takes an ADSpath and
+        domain specifier and builds the correct ADSI searcher object.
+    .PARAMETER Domain
+        The domain to use for the query, defaults to the current domain.
+    .PARAMETER DomainController
+        Domain controller to reflect LDAP queries through.
+    .PARAMETER ADSpath
+        The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local"
+        Useful for OU queries.
+    .PARAMETER ADSprefix
+        Prefix to set for the searcher (like "CN=Sites,CN=Configuration")
+    .PARAMETER PageSize
+        The PageSize to set for the LDAP searcher object.
+    .PARAMETER Credential
+        A [Management.Automation.PSCredential] object of alternate credentials
+        for connection to the target domain.
+    .EXAMPLE
+        PS C:\> Get-DomainSearcher -Domain testlab.local
+    .EXAMPLE
+        PS C:\> Get-DomainSearcher -Domain testlab.local -DomainController SECONDARY.dev.testlab.local
+#>
+
+    param(
+        [Parameter(ValueFromPipeline=$True)]
+        [String]
+        $Domain,
+
+        [String]
+        $DomainController,
+
+        [String]
+        $ADSpath,
+
+        [String]
+        $ADSprefix,
+
+        [ValidateRange(1,10000)] 
+        [Int]
+        $PageSize = 200,
+
+        [Management.Automation.PSCredential]
+        $Credential
+    )
+
+    if(!$Credential) {
+        if(!$Domain){
+            $Domain = (Get-NetDomain).name
+        }
+        elseif(!$DomainController) {
+            try {
+                # if there's no -DomainController specified, try to pull the primary DC
+                #   to reflect queries through
+                $DomainController = ((Get-NetDomain).PdcRoleOwner).Name
+            }
+            catch {
+                throw "Get-DomainSearcher: Error in retrieving PDC for current domain"
+            }
+        }
+    }
+    elseif (!$DomainController) {
+        try {
+            $DomainController = ((Get-NetDomain -Credential $Credential).PdcRoleOwner).Name
+        }
+        catch {
+            throw "Get-DomainSearcher: Error in retrieving PDC for current domain"
+        }
+
+        if(!$DomainController) {
+            throw "Get-DomainSearcher: Error in retrieving PDC for current domain"
+        }
+    }
+
+    $SearchString = "LDAP://"
+
+    if($DomainController) {
+        $SearchString += $DomainController
+        if($Domain){
+            $SearchString += "/"
+        }
+    }
+
+    if($ADSprefix) {
+        $SearchString += $ADSprefix + ","
+    }
+
+    if($ADSpath) {
+        if($ADSpath -like "GC://*") {
+            # if we're searching the global catalog
+            $DN = $AdsPath
+            $SearchString = ""
+        }
+        else {
+            if($ADSpath -like "LDAP://*") {
+                if($ADSpath -match "LDAP://.+/.+") {
+                    $SearchString = ""
+                }
+                else {
+                    $ADSpath = $ADSpath.Substring(7)
+                }
+            }
+            $DN = $ADSpath
+        }
+    }
+    else {
+        if($Domain -and ($Domain.Trim() -ne "")) {
+            $DN = "DC=$($Domain.Replace('.', ',DC='))"
+        }
+    }
+
+    $SearchString += $DN
+    Write-Verbose "Get-DomainSearcher search string: $SearchString"
+
+    if($Credential) {
+        Write-Verbose "Using alternate credentials for LDAP connection"
+        $DomainObject = New-Object DirectoryServices.DirectoryEntry($SearchString, $Credential.UserName, $Credential.GetNetworkCredential().Password)
+        $Searcher = New-Object System.DirectoryServices.DirectorySearcher($DomainObject)
+    }
+    else {
+        $Searcher = New-Object System.DirectoryServices.DirectorySearcher([ADSI]$SearchString)
+    }
+
+    $Searcher.PageSize = $PageSize
+    $Searcher
+}
+
+
+filter Get-NetDomain {
+<#
+    .SYNOPSIS
+        Returns a given domain object.
+    .PARAMETER Domain
+        The domain name to query for, defaults to the current domain.
+    .PARAMETER Credential
+        A [Management.Automation.PSCredential] object of alternate credentials
+        for connection to the target domain.
+    .EXAMPLE
+        PS C:\> Get-NetDomain -Domain testlab.local
+    .EXAMPLE
+        PS C:\> "testlab.local" | Get-NetDomain
+    .LINK
+        http://social.technet.microsoft.com/Forums/scriptcenter/en-US/0c5b3f83-e528-4d49-92a4-dee31f4b481c/finding-the-dn-of-the-the-domain-without-admodule-in-powershell?forum=ITCG
+#>
+
+    param(
+        [Parameter(ValueFromPipeline=$True)]
+        [String]
+        $Domain,
+
+        [Management.Automation.PSCredential]
+        $Credential
+    )
+
+    if($Credential) {
+
+        Write-Verbose "Using alternate credentials for Get-NetDomain"
+
+        if(!$Domain) {
+            # if no domain is supplied, extract the logon domain from the PSCredential passed
+            $Domain = $Credential.GetNetworkCredential().Domain
+            Write-Verbose "Extracted domain '$Domain' from -Credential"
+        }
+
+        $DomainContext = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext('Domain', $Domain, $Credential.UserName, $Credential.GetNetworkCredential().Password)
+
+        try {
+            [System.DirectoryServices.ActiveDirectory.Domain]::GetDomain($DomainContext)
+        }
+        catch {
+            Write-Warning "The specified domain does '$Domain' not exist, could not be contacted, there isn't an existing trust, or the specified credentials are invalid."
+            $Null
+        }
+    }
+    elseif($Domain) {
+        $DomainContext = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext('Domain', $Domain)
+        try {
+            [System.DirectoryServices.ActiveDirectory.Domain]::GetDomain($DomainContext)
+        }
+        catch {
+            Write-Warning "The specified domain '$Domain' does not exist, could not be contacted, or there isn't an existing trust."
+            $Null
+        }
+    }
+    else {
+        [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+    }
+}
+  function Get-FineGrainedPasswordPolicies {
+  [CmdletBinding()]
+    Param (
+      [Parameter(ValueFromPipeline=$True)]
+      [String]
+      $PolicyName = '*',
+
+      [String]
+      $Domain,
+
+      [String]
+      $DomainController,
+
+      [String]
+      $ADSpath,
+
+      [Switch]
+      $FullData,
+
+      [ValidateRange(1,10000)] 
+      [Int]
+      $PageSize = 200,
+
+      [Management.Automation.PSCredential]
+      $Credential
+    )
+
+  begin {
+      $FineGrainedSearcher = Get-DomainSearcher -Domain $Domain -DomainController $DomainController -Credential $Credential -ADSpath $ADSpath -PageSize $PageSize
+  }
+  process {
+      if ($FineGrainedSearcher) {
+              $FineGrainedSearcher.filter="(&(ObjectClass=msDS-PasswordSettings)(name=$PolicyName))"
+          }
+
+          try {
+              $FineGrainedSearcher.FindAll() | Where-Object {$_} | ForEach-Object {
+                  if ($FullData) {
+                      # convert/process the LDAP fields for each result
+                      Convert-LDAPProperty -Properties $_.Properties
+                  }
+                  else { 
+                      # otherwise just returning the ADS paths of the OUs
+                      $_.properties.adspath
+                  }
+              }
+          }
+          catch {
+              Write-Warning $_
+          }
+      }
+  }

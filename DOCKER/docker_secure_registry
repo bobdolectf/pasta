@@ -1,0 +1,62 @@
+
+
+# Docker Secure Registry
+
+Tag: docker registry
+
+```
+docker pull registry:5000/registry:2
+mkdir registry
+docker run -d -p 5000:5000 -v /root/registry:/var/lib/registry --name registry2 registry:5000/registry:2
+echo "127.0.0.1 registry2" >> /etc/hosts
+
+curl registry2:5000/v2/_catalog
+docker tag alpine registry2:5000/alpine
+docker push registry2:5000/alpine
+```
+
+### Enable TLS
+```
+docker stop registry2
+docker rm registry2
+mkdir certs
+cd certs
+//gen CA key
+openssl ecparam -name prime256v1 -genkey -noout -out ca.key
+//gen CA cert
+openssl req -new -x509 -sha256 -key ca.key -out ca.crt
+//gen Server key
+openssl ecparam -name prime256v1 -genkey -noout -out server.key
+//gen server signing request (put the name of the container in the common name FQDN field of the CSR)
+openssl req -new -sha256 -key server.key -out server.csr
+//create server cert using CA cert
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 1000 -sha256
+// run registry container
+docker run -d -p 5000:443 -v /root/registry:/var/lib/registry -v /root/certs:/certs -e REGISTRY_HTTP_ADDR=0.0.0.0:443 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt -e REGISTRY_HTTP_TLS_KEY=/certs/server.key --name registry2 registry:5000/registry:2
+//check to make sure the TSL worked
+curl registry2:5000/v2/_catalog
+// this should work
+curl -k https://registry2:5000/v2/_catalog
+docker push registry2:5000/alpine
+```
+### Enable Auth
+```
+docker stop registry2
+docker rem registry2
+//create password file
+htpasswd -Bbn user password > /root/certs/passwordfile
+
+//run the container
+docker run -d -p 5000:443 -v /root/registry:/var/lib/registry -v /root/certs:/certs -e
+REGISTRY_HTTP_ADDR=0.0.0.0:443 -e
+REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt -e
+REGISTRY_HTTP_TLS_KEY=/certs/server.key -e "REGISTRY_AUTH=htpasswd" -e
+"REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" -e
+REGISTRY_AUTH_HTPASSWD_PATH=/certs/passwordfile --name registry2
+registry:5000/registry:2
+
+// check the registry
+curl -k -u user:password https://registry2:5000/v2/_catalog
+
+docker push registry2:5000/alpine
+```

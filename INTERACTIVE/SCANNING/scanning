@@ -1,0 +1,19 @@
+# SCANS
+
+
+## PING
+for i in `seq 1 255`; do echo 10.254.252.$i >> targs; done && cat targs | xargs -n10 -P4 ping -c1 | grep "bytes from" && rm targs
+
+## NMAP
+//scan
+nmap -sS -T4 -A -sC -oA scanme --stylesheet https://raw.githubusercontent.com/honze-net/nmap-bootstrap-xsl/master/nmap-bootstrap.xsl scanme.nmap.org scanme2.nmap.org
+sudo nmap -sS -T4 -A -sC -oA scanme --top100 --stylesheet ./nmap-bootstrap.xsl scanme.nmap.org scanme2.nmap.org
+sudo nmap -sS -T4 -A -sC -oA scanme --top-ports 100 --stylesheet ./nmap-bootstrap.xsl scanme.nmap.org scanme2.nmap.org
+
+//build report
+xsltproc -o scanme.html nmap-bootstrap.xsl scanme.xml
+
+
+//add stylesheet
+<?xml-stylesheet href="https://raw.githubusercontent.com/honze-net/nmap-bootstrap-xsl/master/nmap-bootstrap.xsl" type="text/xsl"?>
+

@@ -1,0 +1,15 @@
+
+
+
+ps -ef 
+ps -aux
+
+ss -penal
+netstat -antp
+
+uname -a
+
+cat /etc/shadow
+cat /etc/passwd
+ls -haltR /home/
+ls -haltR /var/log /etc/ 

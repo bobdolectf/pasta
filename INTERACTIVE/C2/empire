@@ -1,0 +1,8 @@
+cd /opt/Empire/
+
+sudo ./ps-empire server
+cd /home/sec565/tools/
+./starkiller-1.9.0.AppImage --no-sandbox
+
+cd /opt/Empire/setup/
+./cert.sh

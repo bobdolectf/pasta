@@ -1,0 +1,1 @@
+findomain -t example.com -q | httpx -silent -threads 1000 | gau | grep "=" | qsreplace http://YOUR.burpcollaborator.net

@@ -1,0 +1,11 @@
+dockerfilelinter -f Dockerfile
+https://github.com/buddy-works/dockerfile-linter
+
+dockerfilelint Dockerfile
+https://github.com/replicatedhq/dockerfilelint
+
+dockerlint -f Dockerfile
+https://github.com/RedCoolBeans/dockerlint
+
+ hadolint Dockerfile
+ https://github.com/hadolint/hadolint

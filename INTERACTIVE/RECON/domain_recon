@@ -1,0 +1,159 @@
+
+net localgroup administrators
+
+
+Get-ADUser -Filter 'Name -like "*Smith"' | Format-Table Name, SamAccountName -A
+
+Add-WindowsCapability –online –Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+Get-WindowsCapability -Name RSAT* -Online | Select-Object -Property DisplayName, State
+
+Get-ADUser -SearchBase "OU=IT,DC=Draconem,DC=corp" -Filter *
+
+Get-ADUser -Filter "Description -like '*'" -Properties Description | select name,Description
+
+([adsisearcher]'(memberof=cn=Domain Admins,cn=Users,dc=draconem,dc=corp)').FindAll().GetDirectoryEntry() | Select-Object -Last 1 -Property sAMAccountName
+
+([adsisearcher]'(objectclass=user)').FindAll().GetDirectoryEntry() | Select-Object -Property sAMAccountName
+
+
+//USING POWERVIEW
+
+cd C:\Tools
+. .\Powerview.ps1
+//turn off defender
+Set-MpPreference -DisableRealtimeMonitoring $true
+
+#use the Get-DomainUser PowerView method to enumerate domain users
+Get-DomainUser -Identity <name>
+Get-DomainTrustMapping
+Get-NetDomain
+Get-NetForest
+Get-NetForestDomain
+Get-NetDomainController
+Get-NetComputer | select name
+Get-NetGroup | select name
+Get-NetGroup '*admin*'
+Get-NetSession -ComputerName
+
+Get-NetGroupMember -GroupName "domain admins"
+Get-NetLoggedon -ComputerName <name>
+Get-NetDomainTrust
+Get-NetForestTrust
+Get-NetProcess -ComputerName dc01 -RemoteUsername draconem\administrator -RemotePassword 123456 
+Get-NetProcess -ComputerName dc01 -RemoteUserName offense\administrator -RemotePassword 123456 | ft
+Invoke-FileFinder
+Invoke-MapDomainTrust
+Invoke-ShareFinder -Verbose
+Invoke-UserHunter -ComputerName dc01 -Username *
+Find-DomainShare -CheckShareAccess
+Get-NetFileServer -Verbose
+
+
+.\AdFind.exe -f objectclass=user sAMAccountName Description
+
+.\AdFind -f "sAMAccountName=Staff" member -list
+
+
+
+//use adexplorer.exe to visually search through
+.\ADExplorer.exe -snapshot "dc01.draconem.corp" "snapshot.dat"
+
+
+Get-AdComputer -Filter *
+([adsisearcher]'(ObjectCategory=Computer)').FindAll().GetDirectoryEntry() | Select-Object -Property samaccountname
+
+//powerview and sharpview
+Get-DomainComputer
+
+.\AdFind.exe -f objectclass=computer samaccountname
+
+
+Get-ADTrust -Filter *
+
+
+([adsisearcher]'(objectClass=trustedDomain)').FindAll().GetDirectoryEntry() | select name,trustdirection
+
+.\AdFind.exe -f objectclass=trusteddomain name trustdirection
+
+
+Get-ADDefaultDomainPasswordPolicy
+
+([adsisearcher]'(objectClass=groupPolicyContainer)').FindAll().GetDirectoryEntry()
+type "\\draconem.corp\sysvol\draconem.corp\Policies\{31B2F340-016D-11D2-945F-00C04FB984F9}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
+
+$base=[adsi]'LDAP://DC=draconem,DC=corp'
+$base | Select-Object -Property lockoutThreshold,minPwdLength
+
+Get-DomainPolicy
+
+.\AdFind.exe -default -s base lockoutduration lockoutthreshold lockoutobservationwindow maxpwdage minpwdage minpwdlength
+
+Get-ADFineGrainedPasswordPolicy -Filter *
+
+.\AdFind.exe -f objectclass=computer samaccountname
+
+
+Get-ADTrust -Filter *
+
+
+([adsisearcher]'(objectClass=trustedDomain)').FindAll().GetDirectoryEntry() | select name,trustdirection
+
+.\AdFind.exe -f objectclass=trusteddomain name trustdirection
+
+
+Get-ADDefaultDomainPasswordPolicy
+
+([adsisearcher]'(objectClass=groupPolicyContainer)').FindAll().GetDirectoryEntry()
+type "\\draconem.corp\sysvol\draconem.corp\Policies\{31B2F340-016D-11D2-945F-00C04FB984F9}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
+
+$base=[adsi]'LDAP://DC=draconem,DC=corp'
+$base | Select-Object -Property lockoutThreshold,minPwdLength
+
+Get-DomainPolicy
+
+.\AdFind.exe -default -s base lockoutduration lockoutthreshold lockoutobservationwindow maxpwdage minpwdage minpwdlength
+
+Get-ADFineGrainedPasswordPolicy -Filter *
+
+([adsisearcher]'(ObjectClass=msDS-PasswordSettings)').FindAll().getDirectoryEntry() | Select-Object -Property *
+
+.\AdFind.exe -f ObjectClass=msDS-PasswordSettings
+([adsisearcher]"(&(objectCategory=computer)(ms-MCS-admpwdexpirationtime=*))").findAll().GetdirectoryEntry() | select name
+
+
+Get-DomainComputer -Properties * | Where-Object { $_.'ms-Mcs-admpwdexpirationtime' -ne $null } | select name
+.\AdFind.exe -f "(&(objectclass=computer)(ms-Mcs-admpwdexpirationtime=*))" samaccountname
+
+
+
+// use laps toolkit
+. .\LapsToolkit.ps1
+#enumerate computers with LAPS enabled
+Get-LAPSComputers
+
+#enumerate who is allowed to access LAPS password (no output means default configuration (domain admins only))
+Find-AdmPwdExtendedRights
+
+
+Get-ADServiceAccount -Filter * -Properties * | select name, PrincipalsAllowedToRetrieveManagedPassword
+
+
+([adsisearcher]'(ObjectClass=msDS-GroupManagedServiceAccount)').FindAll().getDirectoryEntry()
+
+
+.\AdFind.exe -sddl -resolvesids -f '(ObjectClass=msDS-GroupManagedServiceAccount)' samaccountname msDS-GroupMSAMembership
+
+
+#forward lookup
+Get-ADComputer -filter * -Properties * | select name,ipv4address
+
+#reverse lookup
+Get-ADComputer -Properties IPv4Address -Filter * | where IPv4Address -eq 'SOME IP ADDRESS' | select name
+
+
+ .\SharpAdidnsdump.exe <DCIP>
+
+
+
+//Sharphound
+C:\Users\]Public\Sharphound.exe -c DCOnly --memcache --zippassword sec565ftw -c DcOnly --zipfilename financialresults.zip

